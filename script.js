@@ -4,6 +4,11 @@ let filteredData = [];
 let map;
 let markersLayer;
 let charts = {};
+// 0 = unsorted, 1 = A->Я (ascending), 2 = Я->A (descending)
+let tableSortState = 0;
+
+let currentPage = 1;
+let itemsPerPage = 10;
 
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', () => {
@@ -12,6 +17,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initMap();
     initFilters();
     initEventListeners();
+    initTableSorting();
     updateUI();
 });
 
@@ -78,10 +84,16 @@ function getMarkerIcon(type) {
         'ЦНАП': '#0066cc',
         'ДІЯ ЦЕНТР': '#28a745',
         'МОБІЛЬНИЙ ЦНАП': '#fd7e14',
-        'default': '#6f42c1'
+        'ВРМ': '#fd7e14',
+        'БТІ': '#dc3545',
+        'DEFAULT': '#6f42c1'
     };
 
-    const color = iconColors[type] || iconColors['default'];
+    const key = String(type || '').trim().toUpperCase();
+    let color = iconColors['DEFAULT'];
+    if (key.includes('ВРМ')) color = iconColors['ВРМ'];
+    else if (key.includes('БТІ')) color = iconColors['БТІ'];
+    else if (iconColors[key]) color = iconColors[key];
 
     return L.divIcon({
         html: `<div style="background-color: ${color}; width: 30px; height: 30px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); border: 3px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.3);"></div>`,
@@ -89,6 +101,18 @@ function getMarkerIcon(type) {
         iconSize: [30, 30],
         iconAnchor: [15, 30]
     });
+}
+
+function isValidField(value) {
+    if (value === null || value === undefined) return false;
+    const s = String(value).trim();
+    if (s === '') return false;
+    if (s.toLowerCase() === 'null') return false;
+    return true;
+}
+
+function displayValue(value, fallback = '') {
+    return isValidField(value) ? String(value) : fallback;
 }
 
 // Update map markers
@@ -113,10 +137,10 @@ function updateMap() {
             // Popup content setup... (скопійовано з попереднього повного коду)
             const popupContent = `
                 <div class="popup-content">
-                    <div class="popup-title">${item['Найменування'] || 'Без назви'}</div>
-                    <div class="popup-info"><strong>Тип:</strong> ${item['Тип закладу'] || 'Не вказано'}</div>
+                    <div class="popup-title">${displayValue(item['Найменування'], 'Без назви')}</div>
+                    <div class="popup-info"><strong>Тип:</strong> ${displayValue(item['Тип закладу'], 'Не вказано')}</div>
                     <div class="popup-info"><strong>Адреса:</strong> ${formatAddress(item)}</div>
-                    <div class="popup-info"><strong>Телефон:</strong> ${item['Телефон'] || 'Не вказано'}</div>
+                    <div class="popup-info"><strong>Телефон:</strong> ${displayValue(item['Телефон'], 'Не вказано')}</div>
                     <button class="popup-button" onclick="showModal('${item.idf}')">Детальніше</button>
                 </div>
             `;
@@ -162,7 +186,7 @@ function updateMap() {
 // Ініціалізація фільтрів (без змін)
 function initFilters() {
     // Region filter
-    const regions = [...new Set(allData.map(item => item['Область']).filter(Boolean))].sort();
+    const regions = [...new Set(allData.map(item => displayValue(item['Область'])).filter(Boolean))].sort();
     const regionFilter = document.getElementById('regionFilter');
     regions.forEach(region => {
         const option = document.createElement('option');
@@ -172,7 +196,7 @@ function initFilters() {
     });
 
     // Type filter
-    const types = [...new Set(allData.map(item => item['Тип закладу']).filter(Boolean))].sort();
+    const types = [...new Set(allData.map(item => displayValue(item['Тип закладу'])).filter(Boolean))].sort();
     const typeFilter = document.getElementById('typeFilter');
     types.forEach(type => {
         const option = document.createElement('option');
@@ -182,7 +206,7 @@ function initFilters() {
     });
 
     // District filter
-    const districts = [...new Set(allData.map(item => item['Район']).filter(Boolean))].sort();
+    const districts = [...new Set(allData.map(item => displayValue(item['Район'])).filter(Boolean))].sort();
     const districtFilter = document.getElementById('districtFilter');
     districts.forEach(district => {
         const option = document.createElement('option');
@@ -214,6 +238,59 @@ function initEventListeners() {
     });
 }
 
+// Initialize table sorting control (stacked triangles) and handlers
+function initTableSorting() {
+    let nameHeader = document.querySelector('.data-table th[data-col="name"]');
+    if (!nameHeader) {
+        const headers = Array.from(document.querySelectorAll('.data-table th'));
+        nameHeader = headers.find(th => th.textContent.trim().toLowerCase().startsWith('назва'));
+    }
+    if (!nameHeader) return;
+
+    const control = document.createElement('span');
+    control.className = 'sort-control';
+    control.innerHTML = `
+        <span class="triangle up" data-state="0"></span>
+        <span class="triangle down" data-state="0"></span>
+    `;
+
+    const inner = document.createElement('span');
+    inner.className = 'th-inner';
+    while (nameHeader.firstChild) {
+        inner.appendChild(nameHeader.firstChild);
+    }
+    nameHeader.appendChild(inner);
+    inner.appendChild(control);
+
+    control.addEventListener('click', (e) => {
+        tableSortState = (tableSortState + 1) % 3;
+        updateSortControlVisuals(control);
+        updateTable();
+    });
+
+    updateSortControlVisuals(control);
+}
+
+function updateSortControlVisuals(control) {
+    const up = control.querySelector('.triangle.up');
+    const down = control.querySelector('.triangle.down');
+    up.classList.remove('active');
+    down.classList.remove('active');
+    up.classList.remove('semi');
+    down.classList.remove('semi');
+
+    if (tableSortState === 0) {
+        up.classList.add('semi');
+        down.classList.add('semi');
+    } else if (tableSortState === 1) {
+        down.classList.add('active');
+        up.classList.add('semi');
+    } else if (tableSortState === 2) {
+        up.classList.add('active');
+        down.classList.add('semi');
+    }
+}
+
 // Apply filters (без змін)
 function applyFilters() {
     const region = document.getElementById('regionFilter').value;
@@ -226,27 +303,28 @@ function applyFilters() {
     const dractsOnly = document.getElementById('dractsFilter').checked;
 
     filteredData = allData.filter(item => {
-        if (region && item['Область'] !== region) return false;
-        if (type && item['Тип закладу'] !== type) return false;
-        if (district && item['Район'] !== district) return false;
+        if (region && displayValue(item['Область']) !== region) return false;
+        if (type && displayValue(item['Тип закладу']) !== type) return false;
+        if (district && displayValue(item['Район']) !== district) return false;
 
         if (search) {
             const searchFields = [
-                item['Найменування'],
-                item['Населений пункт'],
-                item['Вулиця']
+                displayValue(item['Найменування']),
+                displayValue(item['Населений пункт']),
+                displayValue(item['Вулиця'])
             ].join(' ').toLowerCase();
             if (!searchFields.includes(search)) return false;
         }
 
-        if (wifiOnly && item['Вільний Wi-Fi'] !== 'так') return false;
-        if (accessibleOnly && item['Вільний (безперешкодний) вхід або пандус'] !== 'так') return false;
-        if (onlineOnly && item['Онлайн-консультування'] !== 'так') return false;
-        if (dractsOnly && item['Послуги ДРАЦС'] !== 'так') return false;
+        if (wifiOnly && displayValue(item['Вільний Wi-Fi']).toLowerCase() !== 'так') return false;
+        if (accessibleOnly && displayValue(item['Вільний (безперешкодний) вхід або пандус']).toLowerCase() !== 'так') return false;
+        if (onlineOnly && displayValue(item['Онлайн-консультування']).toLowerCase() !== 'так') return false;
+        if (dractsOnly && displayValue(item['Послуги ДРАЦС']).toLowerCase() !== 'так') return false;
 
         return true;
     });
 
+    currentPage = 1;
     updateUI();
 }
 
@@ -262,6 +340,11 @@ function resetFilters() {
     document.getElementById('dractsFilter').checked = false;
 
     filteredData = [...allData];
+    tableSortState = 0;
+    currentPage = 1; 
+    const sortControl = document.querySelector('.sort-control');
+    if (sortControl) updateSortControlVisuals(sortControl);
+
     updateUI();
 }
 
@@ -277,15 +360,15 @@ function updateUI() {
 function updateStats() {
     document.getElementById('totalCount').textContent = filteredData.length;
 
-    const regions = new Set(filteredData.map(item => item['Область']).filter(Boolean));
+    const regions = new Set(filteredData.map(item => displayValue(item['Область'])).filter(Boolean));
     document.getElementById('regionCount').textContent = regions.size;
 
     const accessible = filteredData.filter(item =>
-        item['Вільний (безперешкодний) вхід або пандус'] === 'так'
+        displayValue(item['Вільний (безперешкодний) вхід або пандус']).toLowerCase() === 'так'
     ).length;
     document.getElementById('accessibleCount').textContent = accessible;
 
-    const wifi = filteredData.filter(item => item['Вільний Wi-Fi'] === 'так').length;
+    const wifi = filteredData.filter(item => displayValue(item['Вільний Wi-Fi']).toLowerCase() === 'так').length;
     document.getElementById('wifiCount').textContent = wifi;
 }
 
@@ -298,48 +381,100 @@ function updateCharts() {
 }
 
 // District chart
-// ЗМІНЕНО: Логіка для побудови графіка за районами
 function updateDistrictChart() {
     const districtCounts = {};
     filteredData.forEach(item => {
-        const district = item['Район'] || 'Не вказано'; // ВИКОРИСТОВУЄМО 'Район'
+        const district = displayValue(item['Район'], 'Не вказано');
         districtCounts[district] = (districtCounts[district] || 0) + 1;
     });
 
-    // Показуємо топ-10 районів для кращої візуалізації
     const sortedDistricts = Object.entries(districtCounts)
         .sort((a, b) => b[1] - a[1])
-        .slice(0, 10);
+        .slice(0, 8);
 
-    const ctx = document.getElementById('regionChart'); // Зберігаємо ID елемента як 'regionChart'
+    const ctx = document.getElementById('regionChart');
 
-    if (charts.region) charts.region.destroy(); // Зберігаємо посилання як 'charts.region'
+    if (charts.region) charts.region.destroy();
+
+    const shortLabels = sortedDistricts.map(([district]) => {
+        if (district.length > 15) {
+            return district.substring(0, 12) + '...';
+        }
+        return district;
+    });
 
     charts.region = new Chart(ctx, {
         type: 'bar',
         data: {
-            labels: sortedDistricts.map(([district]) => district),
+            labels: shortLabels,
             datasets: [{
                 label: 'Кількість закладів',
                 data: sortedDistricts.map(([, count]) => count),
-                backgroundColor: 'rgba(0, 102, 204, 0.7)',
-                borderColor: 'rgba(0, 102, 204, 1)',
-                borderWidth: 1
+                backgroundColor: [
+                    'rgba(0, 102, 204, 0.8)',
+                    'rgba(40, 167, 69, 0.8)',
+                    'rgba(253, 126, 20, 0.8)',
+                    'rgba(111, 66, 193, 0.8)',
+                    'rgba(220, 53, 69, 0.8)',
+                    'rgba(23, 162, 184, 0.8)',
+                    'rgba(255, 193, 7, 0.8)',
+                    'rgba(108, 117, 125, 0.8)'
+                ],
+                borderColor: [
+                    'rgba(0, 102, 204, 1)',
+                    'rgba(40, 167, 69, 1)',
+                    'rgba(253, 126, 20, 1)',
+                    'rgba(111, 66, 193, 1)',
+                    'rgba(220, 53, 69, 1)',
+                    'rgba(23, 162, 184, 1)',
+                    'rgba(255, 193, 7, 1)',
+                    'rgba(108, 117, 125, 1)'
+                ],
+                borderWidth: 1,
+                borderRadius: 4
             }]
         },
         options: {
             responsive: true,
-            maintainAspectRatio: true,
+            maintainAspectRatio: false,
             plugins: {
                 legend: { display: false },
                 title: {
                     display: true,
-                    text: 'Розподіл за районами (Топ-10)', // ЗМІНЕНО ЗАГОЛОВОК
-                    font: { size: 16 }
+                    text: 'Топ районів за кількістю закладів',
+                    font: { size: 14, weight: 600 },
+                    padding: { bottom: 20 }
+                },
+                tooltip: {
+                    callbacks: {
+                        title: function(tooltipItems) {
+                            const index = tooltipItems[0].dataIndex;
+                            return sortedDistricts[index][0]; 
+                        }
+                    }
                 }
             },
             scales: {
-                y: { beginAtZero: true }
+                y: { 
+                    beginAtZero: true,
+                    ticks: {
+                        stepSize: 1,
+                        font: { size: 12 }
+                    },
+                    grid: {
+                        color: 'rgba(0, 0, 0, 0.1)'
+                    }
+                },
+                x: {
+                    ticks: {
+                        font: { size: 11 },
+                        maxRotation: 45,
+                        minRotation: 0
+                    },
+                    grid: {
+                        display: false
+                    }
+                }
             }
         }
     });
@@ -349,7 +484,7 @@ function updateDistrictChart() {
 function updateTypeChart() {
     const typeCounts = {};
     filteredData.forEach(item => {
-        const type = item['Тип закладу'] || 'Не вказано';
+        const type = displayValue(item['Тип закладу'], 'Не вказано');
         typeCounts[type] = (typeCounts[type] || 0) + 1;
     });
 
@@ -357,18 +492,29 @@ function updateTypeChart() {
 
     if (charts.type) charts.type.destroy();
 
+    const labels = Object.keys(typeCounts);
+    const data = Object.values(typeCounts);
+    const defaultPalette = [
+        'rgba(0, 102, 204, 0.8)',
+        'rgba(40, 167, 69, 0.8)',
+        'rgba(253, 126, 20, 0.8)',
+        'rgba(111, 66, 193, 0.8)'
+    ];
+
+    const backgroundColor = labels.map((label, i) => {
+        if (String(label).toUpperCase().includes('БТІ')) {
+            return 'rgba(220, 53, 69, 0.8)';
+        }
+        return defaultPalette[i % defaultPalette.length];
+    });
+
     charts.type = new Chart(ctx, {
         type: 'doughnut',
         data: {
-            labels: Object.keys(typeCounts),
+            labels,
             datasets: [{
-                data: Object.values(typeCounts),
-                backgroundColor: [
-                    'rgba(0, 102, 204, 0.8)',
-                    'rgba(40, 167, 69, 0.8)',
-                    'rgba(253, 126, 20, 0.8)',
-                    'rgba(111, 66, 193, 0.8)'
-                ]
+                data,
+                backgroundColor
             }]
         },
         options: {
@@ -383,19 +529,35 @@ function updateTypeChart() {
     });
 }
 
-// Services chart (без змін)
+// Services chart
 function updateServicesChart() {
     const services = {
-        'Паспортні': filteredData.filter(i => i['Паспортні послуги'] === 'так').length,
-        'ДРАЦС': filteredData.filter(i => i['Послуги ДРАЦС'] === 'так').length,
-        'Соціальні': filteredData.filter(i => i['Соціальні послуги'] === 'так').length,
-        'Водіям': filteredData.filter(i => i['Послуги водіям'] === 'так').length,
-        'Онлайн': filteredData.filter(i => i['Онлайн-консультування'] === 'так').length
+        'Паспортні': filteredData.filter(i => displayValue(i['Паспортні послуги']).toLowerCase() === 'так').length,
+        'ДРАЦС': filteredData.filter(i => displayValue(i['Послуги ДРАЦС']).toLowerCase() === 'так').length,
+        'Соціальні': filteredData.filter(i => displayValue(i['Соціальні послуги']).toLowerCase() === 'так').length,
+        'Водіям': filteredData.filter(i => displayValue(i['Послуги водіям']).toLowerCase() === 'так').length,
+        'Консультації': filteredData.filter(i => displayValue(i['Онлайн-консультування']).toLowerCase() === 'так').length
     };
 
     const ctx = document.getElementById('servicesChart');
 
     if (charts.services) charts.services.destroy();
+
+    const serviceColors = [
+        'rgba(0, 102, 204, 0.8)',   
+        'rgba(220, 53, 69, 0.8)',   
+        'rgba(40, 167, 69, 0.8)',   
+        'rgba(253, 126, 20, 0.8)',  
+        'rgba(111, 66, 193, 0.8)'   
+    ];
+
+    const serviceBorders = [
+        'rgba(0, 102, 204, 1)',
+        'rgba(220, 53, 69, 1)',
+        'rgba(40, 167, 69, 1)',
+        'rgba(253, 126, 20, 1)',
+        'rgba(111, 66, 193, 1)'
+    ];
 
     charts.services = new Chart(ctx, {
         type: 'bar',
@@ -404,33 +566,108 @@ function updateServicesChart() {
             datasets: [{
                 label: 'Кількість закладів',
                 data: Object.values(services),
-                backgroundColor: 'rgba(40, 167, 69, 0.7)',
-                borderColor: 'rgba(40, 167, 69, 1)',
-                borderWidth: 1
+                backgroundColor: serviceColors,
+                borderColor: serviceBorders,
+                borderWidth: 1,
+                borderRadius: 6,
+                borderSkipped: false
             }]
         },
         options: {
             responsive: true,
-            maintainAspectRatio: true,
-            indexAxis: 'y',
+            maintainAspectRatio: false,
             plugins: {
-                legend: { display: false }
+                legend: { 
+                    display: true,
+                    position: 'bottom',
+                    labels: {
+                        generateLabels: function(chart) {
+                            const serviceLabels = Object.keys(services);
+                            const serviceColors = [
+                                'rgba(0, 102, 204, 0.8)',  
+                                'rgba(220, 53, 69, 0.8)',   
+                                'rgba(40, 167, 69, 0.8)',   
+                                'rgba(253, 126, 20, 0.8)',  
+                                'rgba(111, 66, 193, 0.8)'   
+                            ];
+                            
+                            return serviceLabels.map((label, index) => ({
+                                text: label,
+                                fillStyle: serviceColors[index],
+                                strokeStyle: serviceColors[index],
+                                lineWidth: 0,
+                                hidden: false,
+                                index: index
+                            }));
+                        },
+                        usePointStyle: true,
+                        pointStyle: 'rect',
+                        font: {
+                            size: 12
+                        },
+                        padding: 15
+                    }
+                },
+                title: {
+                    display: true,
+                    text: 'Наявність послуг у закладах',
+                    font: { size: 14, weight: 600 },
+                    padding: { bottom: 20 }
+                },
+                tooltip: {
+                    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                    titleColor: 'white',
+                    bodyColor: 'white',
+                    borderColor: 'rgba(255, 255, 255, 0.2)',
+                    borderWidth: 1,
+                    cornerRadius: 8
+                }
             },
             scales: {
-                x: { beginAtZero: true }
+                y: { 
+                    beginAtZero: true,
+                    ticks: {
+                        stepSize: Math.max(1, Math.ceil(Math.max(...Object.values(services)) / 10)),
+                        font: { size: 12 }
+                    },
+                    grid: {
+                        color: 'rgba(0, 0, 0, 0.1)'
+                    },
+                    title: {
+                        display: true,
+                        text: 'Кількість закладів',
+                        font: { size: 12, weight: 500 }
+                    }
+                },
+                x: {
+                    ticks: {
+                        font: { size: 11, weight: 500 },
+                        maxRotation: 0,
+                        color: 'rgba(0, 0, 0, 0.8)'
+                    },
+                    grid: {
+                        display: false
+                    }
+                }
+            },
+            layout: {
+                padding: {
+                    top: 10,
+                    bottom: 10
+                }
             }
         }
     });
 }
 
-// Infrastructure chart (без змін)
+// Infrastructure chart
 function updateInfrastructureChart() {
     const infrastructure = {
-        'WiFi': filteredData.filter(i => i['Вільний Wi-Fi'] === 'так').length,
-        'Пандус': filteredData.filter(i => i['Вільний (безперешкодний) вхід або пандус'] === 'так').length,
-        'Санвузол': filteredData.filter(i => i['Обладнана санітарна кімната'] === 'так').length,
-        'Стоянка': filteredData.filter(i => i['Наявність безоплатної стоянки автотранспорту для осіб з інвалідністю'] === 'так').length,
-        'Ел. черга': filteredData.filter(i => i['Електронна черга'] === 'так').length
+        'WiFi': filteredData.filter(i => displayValue(i['Вільний Wi-Fi']).toLowerCase() === 'так').length,
+        'Пандус': filteredData.filter(i => displayValue(i['Вільний (безперешкодний) вхід або пандус']).toLowerCase() === 'так').length,
+        'Санвузол': filteredData.filter(i => displayValue(i['Обладнана санітарна кімната']).toLowerCase() === 'так').length,
+        'Стоянка': filteredData.filter(i => displayValue(i['Наявність безоплатної стоянки автотранспорту для осіб з інвалідністю']).toLowerCase() === 'так').length,
+        'Ел. черга': filteredData.filter(i => displayValue(i['Електронна черга']).toLowerCase() === 'так').length
     };
 
     const ctx = document.getElementById('infrastructureChart');
@@ -461,21 +698,39 @@ function updateInfrastructureChart() {
     });
 }
 
-// Update table (без змін)
 function updateTable() {
     const tbody = document.getElementById('tableBody');
     tbody.innerHTML = '';
 
-    // Show only first 100 for performance
-    const displayData = filteredData.slice(0, 100);
+    let displayData = filteredData.slice();
 
-    displayData.forEach(item => {
+    if (tableSortState === 1) {
+        displayData.sort((a, b) => {
+            const aName = displayValue(a['Найменування'], '').trim();
+            const bName = displayValue(b['Найменування'], '').trim();
+            return aName.localeCompare(bName, 'uk', { sensitivity: 'base' });
+        });
+    } else if (tableSortState === 2) {
+        displayData.sort((a, b) => {
+            const aName = displayValue(a['Найменування'], '').trim();
+            const bName = displayValue(b['Найменування'], '').trim();
+            return bName.localeCompare(aName, 'uk', { sensitivity: 'base' });
+        });
+    }
+
+    const totalItems = displayData.length;
+    const totalPages = Math.ceil(totalItems / itemsPerPage);
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    const pageData = displayData.slice(startIndex, endIndex);
+
+    pageData.forEach(item => {
         const row = tbody.insertRow();
 
-        row.insertCell(0).textContent = item['Найменування'] || 'Без назви';
-        row.insertCell(1).textContent = item['Тип закладу'] || '-';
-        row.insertCell(2).textContent = item['Область'] || '-';
-        row.insertCell(3).textContent = item['Населений пункт'] || '-';
+        row.insertCell(0).textContent = displayValue(item['Найменування'], 'Без назви');
+        row.insertCell(1).textContent = displayValue(item['Тип закладу'], '-');
+        row.insertCell(2).textContent = displayValue(item['Область'], '-');
+        row.insertCell(3).textContent = displayValue(item['Населений пункт'], '-');
         row.insertCell(4).textContent = formatAddress(item);
 
         const actionsCell = row.insertCell(5);
@@ -486,16 +741,120 @@ function updateTable() {
         actionsCell.appendChild(viewBtn);
     });
 
-    document.getElementById('tableCounter').textContent =
-        `Знайдено: ${filteredData.length}${filteredData.length > 100 ? ' (показано перші 100)' : ''}`;
+    const start = totalItems > 0 ? startIndex + 1 : 0;
+    const end = Math.min(endIndex, totalItems);
+    document.getElementById('tableCounter').textContent = 
+        `Показано ${start}-${end} з ${totalItems} записів`;
+
+    updatePagination(totalPages);
+}
+
+function updatePagination(totalPages) {
+    const paginationContainer = document.getElementById('pagination');
+    if (!paginationContainer) {
+        createPaginationContainer();
+        return updatePagination(totalPages);
+    }
+
+    paginationContainer.innerHTML = '';
+
+    if (totalPages <= 1) {
+        paginationContainer.style.display = 'none';
+        return;
+    }
+
+    paginationContainer.style.display = 'flex';
+
+    const prevBtn = document.createElement('button');
+    prevBtn.className = `pagination-btn ${currentPage === 1 ? 'disabled' : ''}`;
+    prevBtn.textContent = '‹ Попередня';
+    prevBtn.disabled = currentPage === 1;
+    prevBtn.onclick = () => {
+        if (currentPage > 1) {
+            currentPage--;
+            updateTable();
+        }
+    };
+    paginationContainer.appendChild(prevBtn);
+
+    const maxVisiblePages = 5;
+    let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
+    let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+    
+    if (endPage - startPage + 1 < maxVisiblePages) {
+        startPage = Math.max(1, endPage - maxVisiblePages + 1);
+    }
+
+    if (startPage > 1) {
+        const firstBtn = createPageButton(1);
+        paginationContainer.appendChild(firstBtn);
+        
+        if (startPage > 2) {
+            const ellipsis = document.createElement('span');
+            ellipsis.className = 'pagination-ellipsis';
+            ellipsis.textContent = '...';
+            paginationContainer.appendChild(ellipsis);
+        }
+    }
+
+    for (let i = startPage; i <= endPage; i++) {
+        const pageBtn = createPageButton(i);
+        paginationContainer.appendChild(pageBtn);
+    }
+
+    if (endPage < totalPages) {
+        if (endPage < totalPages - 1) {
+            const ellipsis = document.createElement('span');
+            ellipsis.className = 'pagination-ellipsis';
+            ellipsis.textContent = '...';
+            paginationContainer.appendChild(ellipsis);
+        }
+        
+        const lastBtn = createPageButton(totalPages);
+        paginationContainer.appendChild(lastBtn);
+    }
+
+    const nextBtn = document.createElement('button');
+    nextBtn.className = `pagination-btn ${currentPage === totalPages ? 'disabled' : ''}`;
+    nextBtn.textContent = 'Наступна ›';
+    nextBtn.disabled = currentPage === totalPages;
+    nextBtn.onclick = () => {
+        if (currentPage < totalPages) {
+            currentPage++;
+            updateTable();
+        }
+    };
+    paginationContainer.appendChild(nextBtn);
+}
+
+function createPageButton(pageNum) {
+    const btn = document.createElement('button');
+    btn.className = `pagination-btn ${pageNum === currentPage ? 'active' : ''}`;
+    btn.textContent = pageNum;
+    btn.onclick = () => {
+        currentPage = pageNum;
+        updateTable();
+    };
+    return btn;
+}
+
+function createPaginationContainer() {
+    const tableSection = document.querySelector('.table-section');
+    if (!tableSection) return;
+    
+    const paginationContainer = document.createElement('div');
+    paginationContainer.id = 'pagination';
+    paginationContainer.className = 'pagination-container';
+    
+    tableSection.appendChild(paginationContainer);
 }
 
 // Format address (без змін)
 function formatAddress(item) {
     const parts = [
-        item['Вулиця'],
-        item['Будинок'] && item['Будинок'] !== 'null' ? `буд. ${item['Будинок']}` : null,
-        item['Корпус'] && item['Корпус'] !== 'null' ? `корп. ${item['Корпус']}` : null
+        displayValue(item['Вулиця']),
+        isValidField(item['Будинок']) ? `буд. ${item['Будинок']}` : null,
+        isValidField(item['Корпус']) ? `корп. ${item['Корпус']}` : null
     ].filter(Boolean);
     return parts.length > 0 ? parts.join(', ') : 'Адреса не вказана';
 }
@@ -510,8 +869,8 @@ function showModal(idf) {
 
     modalBody.innerHTML = `
         <div class="modal-header">
-            <h2 class="modal-title">${item['Найменування'] || 'Без назви'}</h2>
-            <div class="modal-subtitle">${item['Тип закладу'] || 'Тип не вказано'}</div>
+            <h2 class="modal-title">${displayValue(item['Найменування'], 'Без назви')}</h2>
+            <div class="modal-subtitle">${displayValue(item['Тип закладу'], 'Тип не вказано')}</div>
         </div>
 
         <div class="modal-section">
@@ -526,10 +885,10 @@ function showModal(idf) {
                 <div class="modal-info-item">
                     <div class="modal-info-label">Повна адреса</div>
                     <div class="modal-info-value">
-                        ${item['Індекс'] || ''} ${item['Область'] || ''}, ${item['Район'] || ''},
-                        ${item['Тип населеного пункту'] || ''} ${item['Населений пункт'] || ''},
-                        ${formatAddress(item)}
-                    </div>
+                                ${displayValue(item['Індекс'])} ${displayValue(item['Область'])}${isValidField(item['Район']) ? ', ' + displayValue(item['Район']) : ''}
+                                ${isValidField(item['Тип населеного пункту']) ? ', ' + displayValue(item['Тип населеного пункту']) : ''} ${displayValue(item['Населений пункт'])}
+                                ${formatAddress(item)}
+                            </div>
                 </div>
             </div>
         </div>
@@ -544,27 +903,27 @@ function showModal(idf) {
             <div class="modal-info-grid">
                 <div class="modal-info-item">
                     <div class="modal-info-label">Керівник</div>
-                    <div class="modal-info-value">${item['Керівник'] || 'Не вказано'}</div>
+                    <div class="modal-info-value">${displayValue(item['Керівник'], 'Не вказано')}</div>
                 </div>
                 <div class="modal-info-item">
                     <div class="modal-info-label">Телефон</div>
-                    <div class="modal-info-value">${item['Телефон'] || 'Не вказано'}</div>
+                    <div class="modal-info-value">${displayValue(item['Телефон'], 'Не вказано')}</div>
                 </div>
                 <div class="modal-info-item">
                     <div class="modal-info-label">Email</div>
-                    <div class="modal-info-value">${item['Електронна скринька'] || 'Не вказано'}</div>
+                    <div class="modal-info-value">${displayValue(item['Електронна скринька'], 'Не вказано')}</div>
                 </div>
                 <div class="modal-info-item">
                     <div class="modal-info-label">Веб-сайт</div>
                     <div class="modal-info-value">
-                        ${item['Веб-сайт'] && item['Веб-сайт'] !== 'null'
-                            ? `<a href="${item['Веб-сайт']}" target="_blank" style="color: var(--color-blue);">${item['Веб-сайт']}</a>`
+                        ${isValidField(item['Веб-сайт'])
+                            ? `<a href="${displayValue(item['Веб-сайт'])}" target="_blank" style="color: var(--color-blue);">${displayValue(item['Веб-сайт'])}</a>`
                             : 'Не вказано'}
                     </div>
                 </div>
                 <div class="modal-info-item">
                     <div class="modal-info-label">Графік роботи</div>
-                    <div class="modal-info-value" style="white-space: pre-line;">${item['Графік роботи'] || 'Не вказано'}</div>
+                    <div class="modal-info-value" style="white-space: pre-line;">${displayValue(item['Графік роботи'], 'Не вказано')}</div>
                 </div>
             </div>
         </div>
@@ -621,7 +980,10 @@ function closeModal() {
 
 // Create badge (без змін)
 function createBadge(label, value) {
-    const isYes = value === 'так';
+    if (!isValidField(value)) {
+        return `<span class="modal-badge badge-no">${label}: ✗</span>`;
+    }
+    const isYes = String(value).trim().toLowerCase() === 'так';
     const badgeClass = isYes ? 'badge-yes' : 'badge-no';
     return `<span class="modal-badge ${badgeClass}">${label}: ${isYes ? '✓' : '✗'}</span>`;
 }
