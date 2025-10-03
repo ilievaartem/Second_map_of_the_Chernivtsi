@@ -338,31 +338,79 @@ body {
 /* Charts */
 .charts-container {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    grid-template-columns: repeat(2, 1fr);
     gap: 20px;
     margin-bottom: 24px;
+    align-items: start; 
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .chart-card {
     background: var(--bg-secondary);
     border-radius: var(--radius-lg);
-    padding: 24px;
+    padding: 24px; 
+    padding-inline: 24px; 
     box-shadow: var(--shadow-md);
     position: relative;
-    min-height: 320px;
+    min-height: 260px; 
+    transition: var(--transition);
+    box-sizing: border-box;
+}
+
+.charts-container {
+    margin-left: 0;
+    margin-right: 0;
+}
+
+.chart-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
 }
 
 .chart-title {
     font-size: 16px;
     font-weight: 600;
-    margin-bottom: 8px;
+    margin-bottom: 16px;
     color: var(--text-primary);
     text-align: center;
 }
 
 .chart-card canvas {
-    max-height: 270px !important;
-    height: 270px !important;
+    width: 100% !important; 
+    aspect-ratio: 16 / 9; 
+    height: auto !important;
+    display: block;
+}
+
+.chart-card,
+.table-section,
+.main-content > * {
+    box-sizing: border-box;
+}
+
+@media (orientation: portrait) and (max-width: 900px) {
+    .charts-container {
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+    .chart-card {
+        padding: 20px;
+        min-height: 240px;
+    }
+    .chart-card canvas { aspect-ratio: 4/3; }
+}
+
+@media (orientation: landscape) and (max-width: 900px) {
+    .charts-container {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+    }
+    .chart-card {
+        padding: 16px;
+        min-height: 220px;
+    }
+    .chart-card canvas { aspect-ratio: 16/9; }
 }
 
 /* Table */
@@ -724,6 +772,28 @@ body {
 }
 
 /* Responsive */
+@media (min-width: 1200px) {
+    .charts-container {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 24px;
+    }
+
+    .chart-card {
+        min-height: 300px;
+        padding: 24px;
+    }
+
+    .chart-card canvas {
+        max-height: 240px !important;
+        height: 240px !important;
+    }
+
+    .chart-title {
+        font-size: 16px;
+        margin-bottom: 16px;
+    }
+}
+
 @media (max-width: 768px) {
     .container {
         padding: 12px;
@@ -769,7 +839,18 @@ body {
     }
 
     .charts-container {
-        grid-template-columns: 1fr;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 16px;
+    }
+
+    .chart-card {
+        min-height: 250px;
+        padding: 20px;
+    }
+
+    .chart-card canvas {
+        max-height: 180px !important;
+        height: 180px !important;
     }
 
     .modal-content {
@@ -803,21 +884,6 @@ body {
         margin-top: 4px;
     }
 
-    .charts-container {
-        grid-template-columns: 1fr;
-        gap: 16px;
-    }
-
-    .chart-card {
-        min-height: 300px;
-        padding: 16px;
-    }
-
-    .chart-card canvas {
-        max-height: 240px !important;
-        height: 240px !important;
-    }
-
     .pagination-container {
         gap: 4px;
         margin-top: 16px;
@@ -846,9 +912,14 @@ body {
         gap: 8px;
     }
 
+    .charts-container {
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+
     .chart-card {
-        min-height: 270px;
-        padding: 12px;
+        min-height: 260px;
+        padding: 20px;
     }
 
     .chart-card canvas {
@@ -857,7 +928,7 @@ body {
     }
 
     .chart-title {
-        font-size: 14px;
+        font-size: 15px;
         margin-bottom: 12px;
     }
 }

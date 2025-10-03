@@ -115,6 +115,19 @@ function displayValue(value, fallback = '') {
     return isValidField(value) ? String(value) : fallback;
 }
 
+function isPositiveNumber(value) {
+    if (!isValidField(value)) return false;
+    const n = Number(String(value).trim());
+    return !isNaN(n) && n > 0;
+}
+
+function isAffirmative(value) {
+    if (!isValidField(value)) return false;
+    const s = String(value).trim().toLowerCase();
+    if (s === 'так') return true;
+    return isPositiveNumber(s);
+}
+
 // Update map markers
 // ЗМІНЕНО: Логіка масштабування для "Zoom-in only"
 function updateMap() {
@@ -374,10 +387,12 @@ function updateStats() {
 
 // Update charts
 function updateCharts() {
-    updateDistrictChart(); // ЗМІНЕНО: Викликаємо нову функцію
+    updateDistrictChart(); 
     updateTypeChart();
-    updateServicesChart();
-    updateInfrastructureChart();
+    updateServiceChart();
+    updateAccessibilityChart();
+    updateDigitalChart();
+    updateCommunicationChart();
 }
 
 // District chart
@@ -529,169 +544,203 @@ function updateTypeChart() {
     });
 }
 
-// Services chart
-function updateServicesChart() {
+// Chart 
+function updateServiceChart() {
     const services = {
-        'Паспортні': filteredData.filter(i => displayValue(i['Паспортні послуги']).toLowerCase() === 'так').length,
-        'ДРАЦС': filteredData.filter(i => displayValue(i['Послуги ДРАЦС']).toLowerCase() === 'так').length,
-        'Соціальні': filteredData.filter(i => displayValue(i['Соціальні послуги']).toLowerCase() === 'так').length,
-        'Водіям': filteredData.filter(i => displayValue(i['Послуги водіям']).toLowerCase() === 'так').length,
-        'Консультації': filteredData.filter(i => displayValue(i['Онлайн-консультування']).toLowerCase() === 'так').length
+        'Послуги водіям': filteredData.filter(i => isAffirmative(i['Послуги водіям'])).length,
+        'Паспортні послуги': filteredData.filter(i => isAffirmative(i['Паспортні послуги'])).length,
+        'Кільк. послуг РКМУ 523': filteredData.filter(i => isAffirmative(i['Кількість послуг згідно переліку РКМУ 523 за звітний квартал'])).length,
+        'Послуги ДРАЦС': filteredData.filter(i => isAffirmative(i['Послуги ДРАЦС'])).length,
+        'Соціальні послуги': filteredData.filter(i => isAffirmative(i['Соціальні послуги'])).length,
+        'Онлайн моніторинг': filteredData.filter(i => isAffirmative(i['Онлайн моніторинг якості обслуговування'])).length,
+        'Інфосистеми адмінпослуг': filteredData.filter(i => isAffirmative(i['Забезпечено інфосистемами для надання адмінпослуг'])).length,
+        'Електронна черга': filteredData.filter(i => isAffirmative(i['Електронна черга'])).length
     };
 
-    const ctx = document.getElementById('servicesChart');
+    const ctx = document.getElementById('serviceChart');
+    if (charts.service) charts.service.destroy();
 
-    if (charts.services) charts.services.destroy();
-
-    const serviceColors = [
-        'rgba(0, 102, 204, 0.8)',   
-        'rgba(220, 53, 69, 0.8)',   
-        'rgba(40, 167, 69, 0.8)',   
-        'rgba(253, 126, 20, 0.8)',  
-        'rgba(111, 66, 193, 0.8)'   
-    ];
-
-    const serviceBorders = [
-        'rgba(0, 102, 204, 1)',
-        'rgba(220, 53, 69, 1)',
-        'rgba(40, 167, 69, 1)',
-        'rgba(253, 126, 20, 1)',
-        'rgba(111, 66, 193, 1)'
-    ];
-
-    charts.services = new Chart(ctx, {
-        type: 'bar',
+    charts.service = new Chart(ctx, {
+        type: 'radar',
         data: {
             labels: Object.keys(services),
             datasets: [{
                 label: 'Кількість закладів',
                 data: Object.values(services),
-                backgroundColor: serviceColors,
-                borderColor: serviceBorders,
-                borderWidth: 1,
-                borderRadius: 6,
-                borderSkipped: false
+                backgroundColor: 'rgba(0, 102, 204, 0.2)',
+                borderColor: 'rgba(0, 102, 204, 1)',
+                borderWidth: 2,
+                pointBackgroundColor: 'rgba(0, 102, 204, 1)',
+                pointRadius: 4
             }]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
             plugins: {
-                legend: { 
-                    display: true,
-                    position: 'bottom',
-                    labels: {
-                        generateLabels: function(chart) {
-                            const serviceLabels = Object.keys(services);
-                            const serviceColors = [
-                                'rgba(0, 102, 204, 0.8)',  
-                                'rgba(220, 53, 69, 0.8)',   
-                                'rgba(40, 167, 69, 0.8)',   
-                                'rgba(253, 126, 20, 0.8)',  
-                                'rgba(111, 66, 193, 0.8)'   
-                            ];
-                            
-                            return serviceLabels.map((label, index) => ({
-                                text: label,
-                                fillStyle: serviceColors[index],
-                                strokeStyle: serviceColors[index],
-                                lineWidth: 0,
-                                hidden: false,
-                                index: index
-                            }));
-                        },
-                        usePointStyle: true,
-                        pointStyle: 'rect',
-                        font: {
-                            size: 12
-                        },
-                        padding: 15
-                    }
-                },
+                legend: { display: false },
                 title: {
                     display: true,
-                    text: 'Наявність послуг у закладах',
-                    font: { size: 14, weight: 600 },
-                    padding: { bottom: 20 }
-                },
-                tooltip: {
-                    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-                    titleColor: 'white',
-                    bodyColor: 'white',
-                    borderColor: 'rgba(255, 255, 255, 0.2)',
-                    borderWidth: 1,
-                    cornerRadius: 8
+                    text: 'Сервісні послуги',
+                    font: { size: 13, weight: 600 },
+                    padding: { bottom: 8 }
                 }
             },
             scales: {
-                y: { 
+                r: {
                     beginAtZero: true,
-                    ticks: {
-                        stepSize: Math.max(1, Math.ceil(Math.max(...Object.values(services)) / 10)),
-                        font: { size: 12 }
-                    },
-                    grid: {
-                        color: 'rgba(0, 0, 0, 0.1)'
-                    },
-                    title: {
-                        display: true,
-                        text: 'Кількість закладів',
-                        font: { size: 12, weight: 500 }
-                    }
-                },
-                x: {
-                    ticks: {
-                        font: { size: 11, weight: 500 },
-                        maxRotation: 0,
-                        color: 'rgba(0, 0, 0, 0.8)'
-                    },
-                    grid: {
-                        display: false
-                    }
-                }
-            },
-            layout: {
-                padding: {
-                    top: 10,
-                    bottom: 10
+                    ticks: { stepSize: 1, font: { size: 10 } },
+                    pointLabels: { font: { size: 10 } }
                 }
             }
         }
     });
 }
 
-// Infrastructure chart
-function updateInfrastructureChart() {
-    const infrastructure = {
-        'WiFi': filteredData.filter(i => displayValue(i['Вільний Wi-Fi']).toLowerCase() === 'так').length,
+function updateAccessibilityChart() {
+    const accessibility = {
+        'Місце для колясок': filteredData.filter(i => displayValue(i['Місце для тимчасового розміщення дитячих колясок']).toLowerCase() === 'так').length,
         'Пандус': filteredData.filter(i => displayValue(i['Вільний (безперешкодний) вхід або пандус']).toLowerCase() === 'так').length,
-        'Санвузол': filteredData.filter(i => displayValue(i['Обладнана санітарна кімната']).toLowerCase() === 'так').length,
-        'Стоянка': filteredData.filter(i => displayValue(i['Наявність безоплатної стоянки автотранспорту для осіб з інвалідністю']).toLowerCase() === 'так').length,
-        'Ел. черга': filteredData.filter(i => displayValue(i['Електронна черга']).toLowerCase() === 'так').length
+        'Сходи з поручнями': filteredData.filter(i => displayValue(i['Сходи з поручнями']).toLowerCase() === 'так').length,
+        'Санітарна кімната': filteredData.filter(i => displayValue(i['Обладнана санітарна кімната']).toLowerCase() === 'так').length,
+        'Стоянка для інвалідів': filteredData.filter(i => displayValue(i['Наявність безоплатної стоянки автотранспорту для осіб з інвалідністю']).toLowerCase() === 'так').length,
+        'Зупинка транспорту': filteredData.filter(i => displayValue(i['Наявність зупинок громадського транспорту в радіусі 100м']).toLowerCase() === 'так').length
     };
 
-    const ctx = document.getElementById('infrastructureChart');
+    const ctx = document.getElementById('accessibilityChart');
+    if (charts.accessibility) charts.accessibility.destroy();
 
-    if (charts.infrastructure) charts.infrastructure.destroy();
-
-    charts.infrastructure = new Chart(ctx, {
+    charts.accessibility = new Chart(ctx, {
         type: 'radar',
         data: {
-            labels: Object.keys(infrastructure),
+            labels: Object.keys(accessibility),
             datasets: [{
                 label: 'Кількість закладів',
-                data: Object.values(infrastructure),
-                backgroundColor: 'rgba(253, 126, 20, 0.2)',
-                borderColor: 'rgba(253, 126, 20, 1)',
-                borderWidth: 2
+                data: Object.values(accessibility),
+                backgroundColor: 'rgba(40, 167, 69, 0.2)',
+                borderColor: 'rgba(40, 167, 69, 1)',
+                borderWidth: 2,
+                pointBackgroundColor: 'rgba(40, 167, 69, 1)',
+                pointRadius: 4
             }]
         },
         options: {
             responsive: true,
-            maintainAspectRatio: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                title: {
+                    display: true,
+                    text: 'Безбар\'єрність',
+                    font: { size: 13, weight: 600 },
+                    padding: { bottom: 8 }
+                }
+            },
             scales: {
                 r: {
-                    beginAtZero: true
+                    beginAtZero: true,
+                    ticks: { stepSize: 1, font: { size: 10 } },
+                    pointLabels: { font: { size: 10 } }
+                }
+            }
+        }
+    });
+}
+
+function updateDigitalChart() {
+    const digital = {
+        'Зупинка транспорту': filteredData.filter(i => displayValue(i['Наявність зупинок громадського транспорту в радіусі 100м']).toLowerCase() === 'так').length,
+        'WiFi': filteredData.filter(i => displayValue(i['Вільний Wi-Fi']).toLowerCase() === 'так').length,
+        'Веб-сайт': filteredData.filter(i => displayValue(i['Веб-сайт центру або спеціаліозвана веб-сторінка']).toLowerCase() === 'так').length,
+        'Оплата адмінпослуг': filteredData.filter(i => displayValue(i['Оплата адмінпослуг']).toLowerCase() === 'так').length,
+        'Консультування телефоном': filteredData.filter(i => displayValue(i['Консультування телефоном']).toLowerCase() === 'так').length,
+        'Онлайн-консультування': filteredData.filter(i => displayValue(i['Онлайн-консультування']).toLowerCase() === 'так').length,
+        'Інформація про хід': filteredData.filter(i => displayValue(i['Інформація про хід розгляду страви']).toLowerCase() === 'так').length
+    };
+
+    const ctx = document.getElementById('digitalChart');
+    if (charts.digital) charts.digital.destroy();
+
+    charts.digital = new Chart(ctx, {
+        type: 'radar',
+        data: {
+            labels: Object.keys(digital),
+            datasets: [{
+                label: 'Кількість закладів',
+                data: Object.values(digital),
+                backgroundColor: 'rgba(253, 126, 20, 0.2)',
+                borderColor: 'rgba(253, 126, 20, 1)',
+                borderWidth: 2,
+                pointBackgroundColor: 'rgba(253, 126, 20, 1)',
+                pointRadius: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                title: {
+                    display: true,
+                    text: 'Цифрові послуги',
+                    font: { size: 13, weight: 600 },
+                    padding: { bottom: 8 }
+                }
+            },
+            scales: {
+                r: {
+                    beginAtZero: true,
+                    ticks: { stepSize: 1, font: { size: 10 } },
+                    pointLabels: { font: { size: 10 } }
+                }
+            }
+        }
+    });
+}
+
+function updateCommunicationChart() {
+    const communication = {
+        'Відеоперекладач': filteredData.filter(i => displayValue(i['Відеоперекладач жестової мови']).toLowerCase() === 'так').length,
+        'Візуалізація на дисплеях': filteredData.filter(i => displayValue(i['Візуалізація інформації на дисплеях']).toLowerCase() === 'так').length,
+    'Посилання звуку в інфоматах': filteredData.filter(i => isAffirmative(i['Посилання звуку в інфоматах'] || i['Посилення звуку в інфоматах'])).length,
+        'Мобільна валіза': filteredData.filter(i => displayValue(i['Мобільна валіза']).toLowerCase() === 'так').length,
+        'Мобільний ЦНАП': filteredData.filter(i => displayValue(i['Мобільний ЦНАП']).toLowerCase() === 'так').length
+    };
+
+    const ctx = document.getElementById('communicationChart');
+    if (charts.communication) charts.communication.destroy();
+
+    charts.communication = new Chart(ctx, {
+        type: 'radar',
+        data: {
+            labels: Object.keys(communication),
+            datasets: [{
+                label: 'Кількість закладів',
+                data: Object.values(communication),
+                backgroundColor: 'rgba(111, 66, 193, 0.2)',
+                borderColor: 'rgba(111, 66, 193, 1)',
+                borderWidth: 2,
+                pointBackgroundColor: 'rgba(111, 66, 193, 1)',
+                pointRadius: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                title: {
+                    display: true,
+                    text: 'Доступна комунікація',
+                    font: { size: 13, weight: 600 },
+                    padding: { bottom: 8 }
+                }
+            },
+            scales: {
+                r: {
+                    beginAtZero: true,
+                    ticks: { stepSize: 1, font: { size: 10 } },
+                    pointLabels: { font: { size: 10 } }
                 }
             }
         }
