@@ -234,11 +234,29 @@ body {
 .section-title {
     font-size: 20px;
     font-weight: 600;
-    margin-bottom: 20px;
+    margin-bottom: 5px;
     display: flex;
     align-items: center;
     gap: 10px;
     color: var(--text-primary);
+}
+
+.section-actions {
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+}
+
+@media (max-width: 600px) {
+    .section-title {
+        flex-wrap: wrap;
+        row-gap: 10px;
+    }
+    .section-actions {
+        width: 100%;
+        justify-content: flex-end;
+    }
 }
 
 .section-icon {

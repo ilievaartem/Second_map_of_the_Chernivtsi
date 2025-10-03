@@ -19,7 +19,6 @@
 </head>
 <body>
     <div class="container">
-        <!-- Header -->
         <header class="header">
             <div class="header-content">
                 <h1 class="title">
@@ -29,29 +28,9 @@
                     </svg>
                     Аналітичний дашборд ЦНАП
                 </h1>
-                <div class="header-actions">
-                    <button id="themeToggle" class="btn-icon" aria-label="Перемкнути тему">
-                        <svg class="theme-icon sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <circle cx="12" cy="12" r="5"></circle>
-                            <line x1="12" y1="1" x2="12" y2="3"></line>
-                            <line x1="12" y1="21" x2="12" y2="23"></line>
-                            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
-                            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
-                            <line x1="1" y1="12" x2="3" y2="12"></line>
-                            <line x1="21" y1="12" x2="23" y2="12"></line>
-                            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
-                            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
-                        </svg>
-                        <svg class="theme-icon moon-icon hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
-                        </svg>
-                    </button>
-                    <button id="resetFilters" class="btn-secondary">Скинути фільтри</button>
-                </div>
             </div>
         </header>
 
-        <!-- Stats Cards -->
         <div class="stats-grid">
             <div class="stat-card">
                 <div class="stat-icon blue">
@@ -108,13 +87,31 @@
             </div>
         </div>
 
-        <!-- Filters -->
         <div class="filters-section">
             <h2 class="section-title">
                 <svg class="section-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
                 </svg>
                 Фільтри
+                <span class="section-actions">
+                    <button id="themeToggle" class="btn-icon" aria-label="Перемкнути тему">
+                        <svg class="theme-icon sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="5"></circle>
+                            <line x1="12" y1="1" x2="12" y2="3"></line>
+                            <line x1="12" y1="21" x2="12" y2="23"></line>
+                            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                            <line x1="1" y1="12" x2="3" y2="12"></line>
+                            <line x1="21" y1="12" x2="23" y2="12"></line>
+                            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                        </svg>
+                        <svg class="theme-icon moon-icon hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                        </svg>
+                    </button>
+                    <button id="resetFilters" class="btn-secondary">Скинути фільтри</button>
+                </span>
             </h2>
             <div class="filters-grid">
                 <div class="filter-group">
@@ -164,9 +161,7 @@
             </div>
         </div>
 
-        <!-- Main Content -->
         <div class="main-content">
-            <!-- Map -->
             <div class="map-container">
                 <h2 class="section-title">
                     <svg class="section-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -180,7 +175,6 @@
                 <div id="map"></div>
             </div>
 
-            <!-- Charts -->
             <div class="charts-container">
                 <div class="chart-card">
                     <h3 class="chart-title">Розподіл за областями</h3>
@@ -214,7 +208,6 @@
             </div>
         </div>
 
-        <!-- Table -->
         <div class="table-section">
             <h2 class="section-title">
                 <svg class="section-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -247,7 +240,6 @@
         </div>
     </div>
 
-    <!-- Modal -->
     <div id="modal" class="modal">
         <div class="modal-content">
             <button class="modal-close" id="modalClose">&times;</button>
@@ -255,7 +247,6 @@
         </div>
     </div>
 
-    <!-- Loading -->
     <div id="loading" class="loading">
         <div class="loading-spinner"></div>
         <p>Завантаження даних...</p>
